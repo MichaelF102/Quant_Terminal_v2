@@ -83,75 +83,80 @@ def run_tradingview_screener(
         ]
         q = q.select(*cols)
 
+        conditions = []
+
         # Exchange filter
         if exchange and exchange != "All" and "All" not in exchange:
-            q = q.where(col("exchange") == exchange)
+            conditions.append(col("exchange") == exchange)
         elif market == "india" and (exchange == "All" or "All" in exchange):
-            q = q.where(col("exchange").isin(["NSE", "BSE"]))
+            conditions.append(col("exchange").isin(["NSE", "BSE"]))
 
         # Preset rules
         if preset == "🚀 Bullish Momentum Breakout":
-            q = (
-                q.where(col("RSI") >= 55)
-                .where(col("RSI") <= 75)
-                .where(col("change") > 0)
-                .where(col("close") > col("SMA50"))
-            )
+            conditions.extend([
+                col("RSI") >= 55,
+                col("RSI") <= 75,
+                col("change") > 0,
+                col("close") > col("SMA50"),
+            ])
         elif preset == "📉 Oversold Mean Reversion":
-            q = q.where(col("RSI") < 35).where(col("RSI") > 5)
+            conditions.extend([col("RSI") < 35, col("RSI") > 5])
         elif preset == "⚡ High Volume Accumulation":
-            q = q.where(col("relative_volume_10d_calc") >= 1.5).where(col("change") > 0)
+            conditions.extend([col("relative_volume_10d_calc") >= 1.5, col("change") > 0])
         elif preset == "👑 Large-Cap Quality Compounders":
             threshold = 50000000000 if market == "india" else 50000000000  # ₹5k Cr or $50B
-            q = q.where(col("market_cap_basic") >= threshold)
+            conditions.append(col("market_cap_basic") >= threshold)
         elif preset == "💰 High Dividend Value":
-            q = q.where(col("price_earnings_ttm") > 0).where(col("price_earnings_ttm") <= 25)
+            conditions.extend([col("price_earnings_ttm") > 0, col("price_earnings_ttm") <= 25])
         elif preset == "🏆 52-Week High Breakouts":
-            q = q.where(col("change") > 1.0).where(col("RSI") >= 60)
+            conditions.extend([col("change") > 1.0, col("RSI") >= 60])
         elif preset == "🛡️ Strong Buy Technical Consensus":
-            q = q.where(col("Recommend.All") >= 0.3)
+            conditions.append(col("Recommend.All") >= 0.3)
 
         # Numerical input condition filters
         if min_mcap > 0:
-            q = q.where(col("market_cap_basic") >= min_mcap)
+            conditions.append(col("market_cap_basic") >= min_mcap)
         if max_mcap < 1e15:
-            q = q.where(col("market_cap_basic") <= max_mcap)
+            conditions.append(col("market_cap_basic") <= max_mcap)
 
         if min_pe > 0:
-            q = q.where(col("price_earnings_ttm") >= min_pe)
+            conditions.append(col("price_earnings_ttm") >= min_pe)
         if max_pe < 200:
-            q = q.where(col("price_earnings_ttm") <= max_pe)
+            conditions.append(col("price_earnings_ttm") <= max_pe)
 
         if min_rsi > 0:
-            q = q.where(col("RSI") >= min_rsi)
+            conditions.append(col("RSI") >= min_rsi)
         if max_rsi < 100:
-            q = q.where(col("RSI") <= max_rsi)
+            conditions.append(col("RSI") <= max_rsi)
 
         if min_rvol > 0:
-            q = q.where(col("relative_volume_10d_calc") >= min_rvol)
+            conditions.append(col("relative_volume_10d_calc") >= min_rvol)
 
         if min_change > -100:
-            q = q.where(col("change") >= min_change)
+            conditions.append(col("change") >= min_change)
         if max_change < 100:
-            q = q.where(col("change") <= max_change)
+            conditions.append(col("change") <= max_change)
 
         if min_price > 0:
-            q = q.where(col("close") >= min_price)
+            conditions.append(col("close") >= min_price)
         if max_price < 1000000:
-            q = q.where(col("close") <= max_price)
+            conditions.append(col("close") <= max_price)
 
         if sector != "All" and sector.strip():
-            q = q.where(col("sector") == sector)
+            conditions.append(col("sector") == sector.strip())
 
         # Moving Average condition
         if ma_filter == "Price > 50 SMA":
-            q = q.where(col("close") > col("SMA50"))
+            conditions.append(col("close") > col("SMA50"))
         elif ma_filter == "Price > 200 SMA":
-            q = q.where(col("close") > col("SMA200"))
+            conditions.append(col("close") > col("SMA200"))
         elif ma_filter == "Price > 50 SMA & 200 SMA":
-            q = q.where(col("close") > col("SMA50")).where(col("close") > col("SMA200"))
+            conditions.extend([col("close") > col("SMA50"), col("close") > col("SMA200")])
         elif ma_filter == "Golden Cross (50 SMA > 200 SMA)":
-            q = q.where(col("SMA50") > col("SMA200"))
+            conditions.append(col("SMA50") > col("SMA200"))
+
+        if conditions:
+            q = q.where(*conditions)
 
         # Order & limit
         q = q.order_by(sort_by, ascending=sort_asc).limit(limit)
@@ -669,104 +674,109 @@ def run_tradingview_technical_screener(
         ]
         q = q.select(*cols)
 
+        tech_conditions = []
+
         # Exchange filter
         if exchange and exchange != "All" and "All" not in exchange:
-            q = q.where(col("exchange") == exchange)
+            tech_conditions.append(col("exchange") == exchange)
         elif market == "india" and (exchange == "All" or "All" in exchange):
-            q = q.where(col("exchange").isin(["NSE", "BSE"]))
+            tech_conditions.append(col("exchange").isin(["NSE", "BSE"]))
 
         # Technical Presets
         if preset == "🚀 Bullish Momentum Expansion (RSI 55-75 + SMA 50 Cross)":
-            q = (
-                q.where(col("RSI") >= 55)
-                .where(col("RSI") <= 75)
-                .where(col("close") > col("SMA50"))
-                .where(col("change") > 0)
-            )
+            tech_conditions.extend([
+                col("RSI") >= 55,
+                col("RSI") <= 75,
+                col("close") > col("SMA50"),
+                col("change") > 0,
+            ])
         elif preset == "📈 Golden Cross Breakout (50 SMA > 200 SMA)":
-            q = q.where(col("SMA50") > col("SMA200")).where(col("close") > col("SMA50"))
+            tech_conditions.extend([col("SMA50") > col("SMA200"), col("close") > col("SMA50")])
         elif preset == "📉 Oversold Mean Reversion (RSI < 30 + Stoch < 25)":
-            q = q.where(col("RSI") < 35).where(col("RSI") > 5).where(col("Stoch.K") < 25)
+            tech_conditions.extend([col("RSI") < 35, col("RSI") > 5, col("Stoch.K") < 25])
         elif preset == "⚡ Unusual Volume Surge & Breakout (RVOL > 1.5x + 1D Chg > 0)":
-            q = q.where(col("relative_volume_10d_calc") >= 1.5).where(col("change") > 0.8)
+            tech_conditions.extend([col("relative_volume_10d_calc") >= 1.5, col("change") > 0.8])
         elif preset == "🎯 Bollinger Band Squeeze (Low Volatility Compression)":
-            q = q.where(col("RSI") >= 45).where(col("RSI") <= 55)
+            tech_conditions.extend([col("RSI") >= 45, col("RSI") <= 55])
         elif preset == "🔥 Strong Technical Consensus (Recommend.All >= 0.3)":
-            q = q.where(col("Recommend.All") >= 0.3)
+            tech_conditions.append(col("Recommend.All") >= 0.3)
         elif preset == "🌊 Multi-SMA Bullish Alignment (Price > 20 > 50 > 200)":
-            q = (
-                q.where(col("close") > col("SMA20"))
-                .where(col("SMA20") > col("SMA50"))
-                .where(col("SMA50") > col("SMA200"))
-            )
+            tech_conditions.extend([
+                col("close") > col("SMA20"),
+                col("SMA20") > col("SMA50"),
+                col("SMA50") > col("SMA200"),
+            ])
         elif preset == "💎 Oversold Bounce at Lower Bollinger Band":
-            q = q.where(col("close") <= col("BB.lower") * 1.02).where(col("RSI") < 40)
+            tech_conditions.extend([col("close") <= col("BB.lower"), col("RSI") < 40])
 
         # Numerical input condition filters
         if rsi_min > 0:
-            q = q.where(col("RSI") >= rsi_min)
+            tech_conditions.append(col("RSI") >= rsi_min)
         if rsi_max < 100:
-            q = q.where(col("RSI") <= rsi_max)
+            tech_conditions.append(col("RSI") <= rsi_max)
 
         if min_rvol > 0:
-            q = q.where(col("relative_volume_10d_calc") >= min_rvol)
+            tech_conditions.append(col("relative_volume_10d_calc") >= min_rvol)
 
         if min_change > -100:
-            q = q.where(col("change") >= min_change)
+            tech_conditions.append(col("change") >= min_change)
         if max_change < 100:
-            q = q.where(col("change") <= max_change)
+            tech_conditions.append(col("change") <= max_change)
 
         # Moving Average condition
         if ma_filter == "Price > SMA 20":
-            q = q.where(col("close") > col("SMA20"))
+            tech_conditions.append(col("close") > col("SMA20"))
         elif ma_filter == "Price > SMA 50":
-            q = q.where(col("close") > col("SMA50"))
+            tech_conditions.append(col("close") > col("SMA50"))
         elif ma_filter == "Price > SMA 200":
-            q = q.where(col("close") > col("SMA200"))
+            tech_conditions.append(col("close") > col("SMA200"))
         elif ma_filter == "Price > SMA 50 & 200":
-            q = q.where(col("close") > col("SMA50")).where(col("close") > col("SMA200"))
+            tech_conditions.extend([col("close") > col("SMA50"), col("close") > col("SMA200")])
         elif ma_filter == "Golden Cross (SMA 50 > SMA 200)":
-            q = q.where(col("SMA50") > col("SMA200"))
+            tech_conditions.append(col("SMA50") > col("SMA200"))
         elif ma_filter == "Multi-SMA Stack (Price > 20 > 50 > 200)":
-            q = (
-                q.where(col("close") > col("SMA20"))
-                .where(col("SMA20") > col("SMA50"))
-                .where(col("SMA50") > col("SMA200"))
-            )
+            tech_conditions.extend([
+                col("close") > col("SMA20"),
+                col("SMA20") > col("SMA50"),
+                col("SMA50") > col("SMA200"),
+            ])
         elif ma_filter == "Price < SMA 200 (Discount / Bearish)":
-            q = q.where(col("close") < col("SMA200"))
+            tech_conditions.append(col("close") < col("SMA200"))
 
         # MACD condition
         if macd_filter == "Bullish Crossover (MACD > Signal)":
-            q = q.where(col("MACD.macd") > col("MACD.signal"))
+            tech_conditions.append(col("MACD.macd") > col("MACD.signal"))
         elif macd_filter == "Bearish Crossover (MACD < Signal)":
-            q = q.where(col("MACD.macd") < col("MACD.signal"))
+            tech_conditions.append(col("MACD.macd") < col("MACD.signal"))
         elif macd_filter == "MACD Positive (MACD > 0)":
-            q = q.where(col("MACD.macd") > 0)
+            tech_conditions.append(col("MACD.macd") > 0)
         elif macd_filter == "MACD Negative (MACD < 0)":
-            q = q.where(col("MACD.macd") < 0)
+            tech_conditions.append(col("MACD.macd") < 0)
 
         # Stoch condition
         if stoch_filter == "Oversold (Stoch.K < 20)":
-            q = q.where(col("Stoch.K") < 20)
+            tech_conditions.append(col("Stoch.K") < 20)
         elif stoch_filter == "Overbought (Stoch.K > 80)":
-            q = q.where(col("Stoch.K") > 80)
+            tech_conditions.append(col("Stoch.K") > 80)
         elif stoch_filter == "Bullish Stoch (K > D)":
-            q = q.where(col("Stoch.K") > col("Stoch.D"))
+            tech_conditions.append(col("Stoch.K") > col("Stoch.D"))
 
         # Bollinger filter
         if bb_filter == "Price Touching/Below Lower Band":
-            q = q.where(col("close") <= col("BB.lower") * 1.01)
+            tech_conditions.append(col("close") <= col("BB.lower"))
         elif bb_filter == "Price Touching/Above Upper Band":
-            q = q.where(col("close") >= col("BB.upper") * 0.99)
+            tech_conditions.append(col("close") >= col("BB.upper"))
 
         # Overall technical rating filter
         if tech_rating == "Buy or Strong Buy (Rating > 0.1)":
-            q = q.where(col("Recommend.All") >= 0.1)
+            tech_conditions.append(col("Recommend.All") >= 0.1)
         elif tech_rating == "Strong Buy Only (Rating > 0.3)":
-            q = q.where(col("Recommend.All") >= 0.3)
+            tech_conditions.append(col("Recommend.All") >= 0.3)
         elif tech_rating == "Sell or Strong Sell (Rating < -0.1)":
-            q = q.where(col("Recommend.All") <= -0.1)
+            tech_conditions.append(col("Recommend.All") <= -0.1)
+
+        if tech_conditions:
+            q = q.where(*tech_conditions)
 
         # Order & limit
         q = q.order_by(sort_by, ascending=sort_asc).limit(limit)
@@ -1265,9 +1275,9 @@ def render_page():
                     index=0,
                     key="scr_exchange_select",
                 )
-                if "NSE" in exchange_choice:
+                if exchange_choice.startswith("NSE"):
                     ex_val = "NSE"
-                elif "BSE" in exchange_choice:
+                elif exchange_choice.startswith("BSE"):
                     ex_val = "BSE"
                 else:
                     ex_val = "All"
@@ -1278,11 +1288,11 @@ def render_page():
                     index=0,
                     key="scr_exchange_select_us",
                 )
-                if "NASDAQ" in exchange_choice:
+                if exchange_choice.startswith("NASDAQ"):
                     ex_val = "NASDAQ"
-                elif "NYSE" in exchange_choice:
+                elif exchange_choice.startswith("NYSE"):
                     ex_val = "NYSE"
-                elif "AMEX" in exchange_choice:
+                elif exchange_choice.startswith("AMEX"):
                     ex_val = "AMEX"
                 else:
                     ex_val = "All"
@@ -1315,17 +1325,26 @@ def render_page():
                     "Sector",
                     [
                         "All",
-                        "Finance",
-                        "Technology Services",
-                        "Electronic Technology",
-                        "Energy Minerals",
-                        "Health Technology",
+                        "Commercial Services",
+                        "Communications",
+                        "Consumer Durables",
                         "Consumer Non-Durables",
                         "Consumer Services",
+                        "Distribution Services",
+                        "Electronic Technology",
+                        "Energy Minerals",
+                        "Finance",
+                        "Health Services",
+                        "Health Technology",
+                        "Industrial Services",
+                        "Miscellaneous",
+                        "Non-Energy Minerals",
                         "Process Industries",
-                        "Commercial Services",
-                        "Utilities",
                         "Producer Manufacturing",
+                        "Retail Trade",
+                        "Technology Services",
+                        "Transportation",
+                        "Utilities",
                     ],
                     index=0,
                     key="cond_sector",
@@ -1643,6 +1662,14 @@ def render_page():
             default_a_sym = "RELIANCE.NS"
             default_b_sym = "TCS.NS"
 
+        # Guard against stale session state across universe switches
+        if st.session_state.get("prev_h2h_scope") != comp_scope:
+            st.session_state["prev_h2h_scope"] = comp_scope
+            if "select_label_a" in st.session_state and st.session_state["select_label_a"] not in active_options:
+                st.session_state.pop("select_label_a", None)
+            if "select_label_b" in st.session_state and st.session_state["select_label_b"] not in active_options:
+                st.session_state.pop("select_label_b", None)
+
         # Determine index for Stock A
         stored_a = st.session_state.get("comp_stock_a", default_a_sym).upper()
         idx_a = 0
@@ -1892,9 +1919,19 @@ def render_page():
                         placeholder="e.g., P/E, ROE, Sharpe, Drawdown...",
                         key="h2h_search_input",
                     )
+                display_h2h = h2h_df
+                if filter_cat != "All Dimensions":
+                    display_h2h = display_h2h[display_h2h["Category"] == filter_cat]
+                if h2h_search.strip():
+                    q = h2h_search.strip().lower()
+                    display_h2h = display_h2h[
+                        display_h2h["Metric"].str.lower().str.contains(q, na=False)
+                        | display_h2h["Institutional Benchmark"].str.lower().str.contains(q, na=False)
+                    ]
+
                 with cat_col3:
                     st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
-                    csv_h2h = h2h_df.to_csv(index=False)
+                    csv_h2h = display_h2h.to_csv(index=False)
                     st.download_button(
                         "📥 Export CSV",
                         data=csv_h2h,
@@ -1903,16 +1940,6 @@ def render_page():
                         use_container_width=True,
                         key="dl_h2h_matrix",
                     )
-
-                display_h2h = h2h_df
-                if filter_cat != "All Dimensions":
-                    display_h2h = display_h2h[display_h2h["Category"] == filter_cat]
-                if h2h_search.strip():
-                    q = h2h_search.strip().lower()
-                    display_h2h = display_h2h[
-                        display_h2h["Metric"].str.lower().str.contains(q)
-                        | display_h2h["Institutional Benchmark"].str.lower().str.contains(q)
-                    ]
 
                 st.caption(f"Showing **{len(display_h2h)}** institutional fundamental metrics for **{name_a}** vs **{name_b}**")
 
@@ -2522,15 +2549,19 @@ def render_page():
 
             with tc2:
                 if tech_market_val == "india":
-                    tech_ex_options = ["All", "NSE", "BSE"]
+                    tech_exchange_choice = st.selectbox(
+                        "Primary Exchange",
+                        ["All", "NSE", "BSE"],
+                        index=1,
+                        key="tech_ex_sel_in",
+                    )
                 else:
-                    tech_ex_options = ["All", "NASDAQ", "NYSE", "AMEX"]
-                tech_exchange_choice = st.selectbox(
-                    "Primary Exchange",
-                    tech_ex_options,
-                    index=1 if tech_market_val == "india" else 0,
-                    key="tech_ex_sel",
-                )
+                    tech_exchange_choice = st.selectbox(
+                        "Primary Exchange",
+                        ["All", "NASDAQ", "NYSE", "AMEX"],
+                        index=0,
+                        key="tech_ex_sel_us",
+                    )
 
             with tc3:
                 tech_rating_filter = st.selectbox(
@@ -2907,6 +2938,14 @@ def render_page():
             t_default_a = "RELIANCE.NS"
             t_default_b = "TCS.NS"
 
+        # Guard against stale session state across universe switches
+        if st.session_state.get("prev_tech_h2h_scope") != t_comp_scope:
+            st.session_state["prev_tech_h2h_scope"] = t_comp_scope
+            if "tech_select_label_a" in st.session_state and st.session_state["tech_select_label_a"] not in t_active_options:
+                st.session_state.pop("tech_select_label_a", None)
+            if "tech_select_label_b" in st.session_state and st.session_state["tech_select_label_b"] not in t_active_options:
+                st.session_state.pop("tech_select_label_b", None)
+
         stored_ta = st.session_state.get("tech_stock_a", t_default_a).upper()
         t_idx_a = 0
         for i, opt in enumerate(t_active_options):
@@ -3130,9 +3169,19 @@ def render_page():
                         placeholder="e.g. RSI, ADX, MACD, Squeeze, CMF...",
                         key="tech_search_input",
                     )
+                display_tech_matrix = tech_matrix_df
+                if filter_dim != "All Dimensions":
+                    display_tech_matrix = display_tech_matrix[display_tech_matrix["Category"] == filter_dim]
+                if tech_search.strip():
+                    tq = tech_search.strip().lower()
+                    display_tech_matrix = display_tech_matrix[
+                        display_tech_matrix["Metric"].str.lower().str.contains(tq, na=False)
+                        | display_tech_matrix["Signal / Context"].str.lower().str.contains(tq, na=False)
+                    ]
+
                 with t_filt_col3:
                     st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
-                    csv_tech = tech_matrix_df.to_csv(index=False)
+                    csv_tech = display_tech_matrix.to_csv(index=False)
                     st.download_button(
                         "📥 Export CSV",
                         data=csv_tech,
@@ -3141,16 +3190,6 @@ def render_page():
                         use_container_width=True,
                         key="dl_tech_matrix",
                     )
-
-                display_tech_matrix = tech_matrix_df
-                if filter_dim != "All Dimensions":
-                    display_tech_matrix = display_tech_matrix[display_tech_matrix["Category"] == filter_dim]
-                if tech_search.strip():
-                    tq = tech_search.strip().lower()
-                    display_tech_matrix = display_tech_matrix[
-                        display_tech_matrix["Metric"].str.lower().str.contains(tq)
-                        | display_tech_matrix["Signal / Context"].str.lower().str.contains(tq)
-                    ]
 
                 st.caption(f"Showing **{len(display_tech_matrix)}** technical indicators and quantitative signals for **{t_stock_a}** vs **{t_stock_b}**")
 
